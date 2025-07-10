@@ -1,26 +1,30 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { observer } from 'mobx-react-lite';
+import MovieList from './components/MovieList';
+import MovieDetail from './components/MovieDetail';
+import Favorites from './components/Favorites';
+import FilterPanel from './components/FilterPanel';
+import { useStore } from './store';
+import { Container, CssBaseline } from '@mui/material';
+import Header from './components/Header'; // Новый импорт
 
-function App() {
+const App: React.FC = observer(() => {
+  const store = useStore();
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Router>
+      <CssBaseline />
+      <Header /> {/* Добавляем хедер */}
+      <Container>
+        <FilterPanel />
+        <Routes>
+          <Route path="/" element={<MovieList />} />
+          <Route path="/movie/:id" element={<MovieDetail />} />
+          <Route path="/favorites" element={<Favorites />} /> {/* Новый маршрут */}
+        </Routes>
+      </Container>
+    </Router>
   );
-}
+});
 
 export default App;
