@@ -6,7 +6,7 @@ import Favorites from './components/Favorites';
 import FilterPanel from './components/FilterPanel';
 import { useStore } from './store';
 import { Container, CssBaseline } from '@mui/material';
-import Header from './components/Header'; // Новый импорт
+import Header from './components/Header';
 
 const App: React.FC = observer(() => {
   const store = useStore();
@@ -14,13 +14,13 @@ const App: React.FC = observer(() => {
   return (
     <Router>
       <CssBaseline />
-      <Header /> {/* Добавляем хедер */}
+      <Header />
       <Container>
         <FilterPanel />
         <Routes>
           <Route path="/" element={<MovieList />} />
           <Route path="/movie/:id" element={<MovieDetail />} />
-          <Route path="/favorites" element={<Favorites />} /> {/* Новый маршрут */}
+          <Route path="/favorites" element={<Favorites />} />
         </Routes>
       </Container>
     </Router>

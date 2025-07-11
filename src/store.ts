@@ -19,6 +19,7 @@ interface ApiResponse {
   docs: Movie[];
   page: number;
   limit: number;
+  total: number;
 }
 
 class MovieStore {
@@ -28,46 +29,67 @@ class MovieStore {
   page = 1;
   hasMore = true;
   ratingRange = [0, 10];
-  yearRange = [1990, new Date().getFullYear()];
+  yearRange = [1900, new Date().getFullYear()];
   selectedGenres: string[] = [];
   genres: string[] = [];
+  isLoading = false;
 
   constructor() {
     makeAutoObservable(this);
   }
 
   async fetchMovies() {
-    if (!this.hasMore) return;
+    if (!this.hasMore || this.isLoading) return;
+    runInAction(() => {
+      this.isLoading = true;
+    });
     try {
-      console.log('Fetching movies, page:', this.page, 'filters:', { ratingRange: this.ratingRange, yearRange: this.yearRange, genres: this.selectedGenres });
+      const params: any = {
+        page: this.page,
+        limit: 50,
+        selectFields: ['id', 'name', 'year', 'rating', 'poster', 'genres', 'description', 'shortDescription', 'ageRating'],
+      };
+      if (this.ratingRange[0] !== 0 || this.ratingRange[1] !== 10) {
+        params['rating.kp'] = `${this.ratingRange[0]}-${this.ratingRange[1]}`;
+      }
+      if (this.yearRange[0] !== 1900 || this.yearRange[1] !== new Date().getFullYear()) {
+        params.year = `${this.yearRange[0]}-${this.yearRange[1]}`;
+      }
+      if (this.selectedGenres.length) {
+        params['genres.name'] = this.selectedGenres.join(',');
+      }
+      console.log('Request params:', params);
       const response = await axios.get<ApiResponse>('https://api.kinopoisk.dev/v1.4/movie', {
-        params: {
-          page: this.page,
-          limit: 50,
-          ratingFrom: this.ratingRange[0],
-          ratingTo: this.ratingRange[1],
-          yearFrom: this.yearRange[0],
-          yearTo: this.yearRange[1],
-          genres: this.selectedGenres.join(','),
-        },
+        params,
         headers: {
           'X-API-KEY': process.env.REACT_APP_KINOPOISK_API_KEY,
         },
       });
       runInAction(() => {
-        // Проверка на дубликаты перед добавлением
-        const newMovies = response.data.docs.filter(newMovie => !this.movies.some(existing => existing.id === newMovie.id));
-        this.movies = this.page === 1 ? newMovies : [...this.movies, ...newMovies];
+        const newMovies = response.data.docs.filter(movie => movie.name && movie.name.trim() !== '' && movie.poster?.url);
+        const filteredNewMovies = newMovies.filter(newMovie => !this.movies.some(existing => existing.id === newMovie.id));
+        this.movies = this.page === 1 ? filteredNewMovies : [...this.movies, ...filteredNewMovies];
         this.page += 1;
-        this.hasMore = response.data.docs.length === 50;
-        if (this.genres.length === 0) this.genres = [...new Set(response.data.docs.flatMap(m => m.genres?.map(g => g.name) || []))];
+        this.hasMore = filteredNewMovies.length === 50 && (response.data.total === 0 || this.movies.length < response.data.total);
+        this.isLoading = false;
+        if (this.genres.length === 0) {
+          this.genres = [...new Set(response.data.docs.flatMap(m => m.genres?.map(g => g.name) || []))].filter(Boolean);
+        }
+        console.log('API Response:', { docs: response.data.docs.length, filtered: filteredNewMovies.length, total: response.data.total, hasMore: this.hasMore });
       });
-    } catch (error) {
-      console.error('Error fetching movies:', error);
+    } catch (error: any) {
+      console.error('Error fetching movies:', error.response?.data || error.message);
+      runInAction(() => {
+        this.hasMore = false;
+        this.isLoading = false;
+      });
     }
   }
 
   async fetchMovieDetail(id: string) {
+    runInAction(() => {
+      this.isLoading = true;
+    });
     try {
       const response = await axios.get<Movie>(`https://api.kinopoisk.dev/v1.4/movie/${id}`, {
         headers: {
@@ -76,9 +98,13 @@ class MovieStore {
       });
       runInAction(() => {
         this.selectedMovie = response.data;
+        this.isLoading = false;
       });
     } catch (error) {
       console.error('Error fetching movie detail:', error);
+      runInAction(() => {
+        this.isLoading = false;
+      });
     }
   }
 
@@ -87,6 +113,7 @@ class MovieStore {
       this.ratingRange = range;
       this.movies = [];
       this.page = 1;
+      this.hasMore = true;
       this.fetchMovies();
     });
   }
@@ -96,6 +123,7 @@ class MovieStore {
       this.yearRange = range;
       this.movies = [];
       this.page = 1;
+      this.hasMore = true;
       this.fetchMovies();
     });
   }
@@ -107,6 +135,7 @@ class MovieStore {
         : [...this.selectedGenres, genre];
       this.movies = [];
       this.page = 1;
+      this.hasMore = true;
       this.fetchMovies();
     });
   }
